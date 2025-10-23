@@ -1,0 +1,26 @@
+{
+  "name": "notes-app",
+  "version": "1.0.0",
+  "description": "Minimal Notes API built with Express, Prisma, and PostgreSQL",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "migrate": "npx prisma migrate dev --name init",
+    "generate": "npx prisma generate",
+    "postinstall": "npm run generate",
+    "test:db:prepare": "NODE_ENV=test DATABASE_URL='file:./test.db' npx prisma db push --schema prisma/schema.test.prisma",
+    "pretest": "npm run test:db:prepare",
+    "test": "jest --runInBand"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^6.18.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.4",
+    "jest": "^30.2.0"
+  }
+}
