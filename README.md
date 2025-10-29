@@ -1,4 +1,4 @@
-# 🗒️ Notes API (Express + Prisma + PostgreSQL)
+# 🗒️ Notes App
 
 This project has been created to meet the following goals:
 

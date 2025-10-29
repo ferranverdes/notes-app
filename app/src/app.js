@@ -19,9 +19,9 @@ app.get("/notes", async (req, res) => {
     select: {
       id: true,
       title: true,
-      description: true,
+      description: true
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "desc" }
   });
 
   res.status(200).json(notes);

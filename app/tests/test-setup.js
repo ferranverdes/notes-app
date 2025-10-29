@@ -5,9 +5,7 @@ const { prisma } = require("../src/prisma");
 beforeEach(async () => {
   try {
     await prisma.$executeRawUnsafe("DELETE FROM Note;");
-    await prisma.$executeRawUnsafe(
-      "DELETE FROM sqlite_sequence WHERE name='Note';"
-    );
+    await prisma.$executeRawUnsafe("DELETE FROM sqlite_sequence WHERE name='Note';");
   } catch (_) {}
 });
 

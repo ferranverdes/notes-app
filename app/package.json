@@ -4,8 +4,9 @@
   "description": "Minimal Notes API built with Express, Prisma, and PostgreSQL",
   "main": "src/server.js",
   "scripts": {
-    "dev": "node src/server.js",
+    "start": "node src/server.js",
     "migrate": "npx prisma migrate dev --name init",
+    "migrate:deploy": "npx prisma migrate deploy",
     "generate": "npx prisma generate",
     "postinstall": "npm run generate",
     "test:db:prepare": "NODE_ENV=test DATABASE_URL='file:./test.db' npx prisma db push --schema prisma/schema.test.prisma",

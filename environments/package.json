@@ -1,0 +1,16 @@
+{
+  "name": "notes-infra",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@pulumi/pulumi": "^3.0.0",
+    "@pulumi/gcp": "^7.0.0",
+    "@pulumi/docker": "^4.0.0"
+  }
+}

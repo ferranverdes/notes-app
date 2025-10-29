@@ -162,5 +162,10 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/node,visualstudiocode
 
+### Custom directives ###
+
 # SQLite database file used for testing
 test.db
+
+# Service account key used within the GCP project to deploy resources
+service-account-key.json

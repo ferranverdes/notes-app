@@ -5,20 +5,16 @@ describe("Notes API (SQLite test client)", () => {
   test("POST /notes creates a note", async () => {
     const payload = {
       title: "Meeting Notes",
-      description: "Discuss Q4 roadmap",
+      description: "Discuss Q4 roadmap"
     };
     const res = await request(app).post("/notes").send(payload).expect(201);
     expect(res.body).toEqual(payload);
   });
 
   test("GET /notes lists notes (newest first)", async () => {
-    await request(app)
-      .post("/notes")
-      .send({ title: "First", description: "One" });
+    await request(app).post("/notes").send({ title: "First", description: "One" });
 
-    await request(app)
-      .post("/notes")
-      .send({ title: "Second", description: "Two" });
+    await request(app).post("/notes").send({ title: "Second", description: "Two" });
 
     const res = await request(app).get("/notes").expect(200);
 
