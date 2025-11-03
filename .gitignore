@@ -169,3 +169,6 @@ test.db
 
 # Service account key used within the GCP project to deploy resources
 service-account-key.json
+
+# GitLab CI Local folder
+.gitlab-ci-local/
