@@ -1,5 +1,5 @@
-name: notes-infra
-description: Build and publish the Notes API Docker image to Google Artifact Registry using Pulumi.
+name: notes-infra-build
+description: Provision and manage the foundational cloud infrastructure for the Notes platform using Pulumi.
 main: ./index.js
 runtime:
   name: nodejs

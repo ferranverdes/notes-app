@@ -1,25 +1,76 @@
-stages: [test]
-
-default:
-  image: node:22-alpine
-  before_script:
-    - cd app
-
-# Reuse deps between pipelines
-cache:
-  key:
-    files:
-      - app/package-lock.json       # refresh cache when lockfile changes
-  paths:
-    - app/node_modules/             # cache installed modules
-    - app/.npm/                     # cache npm package tarballs
-  policy: pull-push                 # pull existing cache before job; update it after completion
+stages: [test, build, deploy]
 
 test:
   stage: test
+  image: node:22-alpine
   variables:
     NODE_ENV: "test"
     DATABASE_URL: "file:./test.db"
+  cache: # reuse deps between pipelines
+    key:
+      files: [app/package-lock.json] # refresh cache when lockfile changes
+    paths:
+      - app/node_modules/ # cache installed modules
+      - app/.npm/ # cache npm package tarballs
+    policy: pull-push # pull existing cache before job; update it after completion
+  before_script:
+    - cd app
   script:
     - npm ci --cache .npm --prefer-offline # install deps using cached packages when available
-    - npm test -- --ci  # npm stops parsing flags; runs Jest in CI mode
+    - npm test -- --ci # npm stops parsing flags; runs Jest in CI mode
+
+build:
+  stage: build
+  image:
+    name: pulumi/pulumi:3.205.0
+    entrypoint: [""] # overrides the image ENTRYPOINT, allowing GitLab to execute commands through /bin/sh
+  services:
+    - docker:28.5.1-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "" # disable TLS → simpler for local DinD
+    DOCKER_HOST: "tcp://docker:2375"
+  cache:
+    key:
+      files: [environments/package-lock.json]
+    paths:
+      - environments/node_modules/
+      - environments/build/.npm/
+    policy: pull-push
+  before_script:
+    - cd environments
+    - echo "$GOOGLE_CREDENTIALS" > ./credentials/service-account-key.json
+    - export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials/service-account-key.json"
+    - cd build
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - pulumi stack select dev
+    - pulumi up --yes
+    - echo "IMAGE_NAME=$(pulumi stack output imageName)" > build.env
+    - echo "IMAGE_DIGEST=$(pulumi stack output repoDigest)" >> build.env
+  artifacts: # define files to be passed between jobs (e.g. env vars, binaries, reports)
+    reports:
+      dotenv: environments/build/build.env
+
+deploy:
+  stage: deploy
+  image:
+    name: pulumi/pulumi:3.205.0
+    entrypoint: [""]
+  needs:
+    - job: build # allows this job to start as soon as 'build' finishes and access its artifacts
+  cache:
+    key:
+      files: [environments/package-lock.json]
+    paths:
+      - environments/node_modules/
+      - environments/deploy/.npm/
+    policy: pull-push
+  before_script:
+    - cd environments
+    - echo "$GOOGLE_CREDENTIALS" > ./credentials/service-account-key.json
+    - export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials/service-account-key.json"
+    - cd deploy
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - pulumi stack select dev
+    - pulumi up --yes

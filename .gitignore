@@ -172,3 +172,6 @@ service-account-key.json
 
 # GitLab CI Local folder
 .gitlab-ci-local/
+
+# GitLab CI build stage env variables
+build.env

@@ -1,0 +1,12 @@
+name: notes-infra-deploy
+description: Publish and operate the Notes application on Google Cloud Run with its supporting services using Pulumi.
+main: ./index.js
+runtime:
+  name: nodejs
+  options:
+    typescript: false
+    packagemanager: npm
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: gcp-javascript

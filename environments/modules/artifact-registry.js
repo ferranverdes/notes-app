@@ -3,6 +3,8 @@
 const gcp = require("@pulumi/gcp");
 const pulumi = require("@pulumi/pulumi");
 const docker = require("@pulumi/docker");
+const fs = require("fs");
+const path = require("path");
 
 /**
  * Creates a Docker-compatible Artifact Registry repository in the specified region.
@@ -68,13 +70,22 @@ function buildAndPushDockerImage(name, localPath, project, region, repository) {
   // Construct the image name following Artifact Registry's required format
   const imageName = pulumi.interpolate`${region}-docker.pkg.dev/${project}/${repository}/${name}`;
 
+  // Read the same service account key used by the GCP provider
+  const saKeyPath = path.resolve(__dirname, "../credentials/service-account-key.json");
+  const saKeyJson = fs.readFileSync(saKeyPath, "utf8");
+
   // Build and push the Docker image to the specified Artifact Registry repository
   const image = new docker.Image(name, {
     build: {
       context: localPath,
       platform: "linux/amd64" // Ensures compatibility with Cloud Run
     },
-    imageName: imageName
+    imageName: imageName,
+    registry: {
+      server: `${region}-docker.pkg.dev`,
+      username: "_json_key",
+      password: saKeyJson
+    }
   });
 
   // Return both the image reference and its content-addressable digest

@@ -1,0 +1,5 @@
+config:
+  gcp:project: dev-notes-837643
+  gcp:projectNumber: 566190516375
+  gcp:region: europe-west1
+  env: development

@@ -1,4 +1,3 @@
-// index.js
 require("dotenv").config({ quiet: true });
 const { faker } = require("@faker-js/faker");
 const { prisma } = require("../../src/prisma");
