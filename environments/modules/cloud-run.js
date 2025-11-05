@@ -120,30 +120,49 @@ function deployPublicCloudRunWithSqlSocket(baseName, image, env, region, databas
 }
 
 /**
- * Create a Cloud Run Job that runs "npm run seed" against the same database
- * using a Cloud SQL Unix socket.
+ * Create a Cloud Run Job that:
  *
- * @param {string} baseName
+ * 1. Enables the required Google Cloud APIs (Cloud Run and IAM)
+ * 2. Uses its own dedicated service account
+ * 3. Connects to the same Cloud SQL instance via Unix socket
+ * 4. Runs "npm run seed" to populate the database
+ * 5. Reuses DATABASE_URL and DIGEST env vars for consistency with the app
+ *
+ * @param {string} baseName                    base name prefix for resources
  * @param {{ imageName: pulumi.Input<string>, repoDigest: pulumi.Input<string> }} image
- * @param {string} env
- * @param {string} region
- * @param {pulumi.Output<string>|string} databaseUrl
- * @param {pulumi.Output<string>|string} connectionName
- * @param {gcp.Provider} provider
+ * @param {string} env                         environment name (e.g. "development")
+ * @param {string} region                      Google Cloud region (e.g. "europe-west1")
+ * @param {pulumi.Output<string>|string} databaseUrl  full DATABASE_URL for the seed job
+ * @param {pulumi.Output<string>|string} connectionName Cloud SQL connection name "<project>:<region>:<instance>"
+ * @param {gcp.Provider} provider              Pulumi GCP provider for authentication
  *
- * @returns {pulumi.Output<string>}   Name of the Cloud Run job
+ * @returns {pulumi.Output<string>}            name of the Cloud Run job
  */
 function createCloudRunSeedJobWithSqlSocket(baseName, image, env, region, databaseUrl, connectionName, provider) {
-  // Separate service account for the seed job
+  // 1. Enable required Google Cloud APIs for the seed job path as well
+  const enableRunApi = new gcp.projects.Service(
+    `${baseName}-seed-enable-run`,
+    { service: "run.googleapis.com", disableOnDestroy: false },
+    { provider }
+  );
+
+  const enableIamApi = new gcp.projects.Service(
+    `${baseName}-seed-enable-iam`,
+    { service: "iam.googleapis.com", disableOnDestroy: false },
+    { provider }
+  );
+
+  // 2. Create a dedicated service account used by the Cloud Run Job
   const jobServiceAccount = new gcp.serviceaccount.Account(
     `${baseName}-sa-cloud-run-seed`,
     {
       accountId: `${baseName}-sa-cloud-run-seed`,
       displayName: pulumi.interpolate`${baseName} Cloud Run seed job service account`
     },
-    { provider }
+    { provider, dependsOn: [enableIamApi] }
   );
 
+  // 3. Grant roles to the job service account for Cloud SQL access and logging
   const jobSaCloudSqlClient = new gcp.projects.IAMMember(
     `${baseName}-seed-sa-cloudsql-client`,
     {
@@ -164,6 +183,7 @@ function createCloudRunSeedJobWithSqlSocket(baseName, image, env, region, databa
     { provider, dependsOn: [jobServiceAccount] }
   );
 
+  // 4. Define the Cloud Run v2 Job that runs "npm run seed"
   const job = pulumi
     .all([image.imageName, image.repoDigest, databaseUrl, connectionName, jobServiceAccount.email])
     .apply(([imageName, imageDigest, dbUrl, connName, saEmail]) => {
@@ -180,6 +200,8 @@ function createCloudRunSeedJobWithSqlSocket(baseName, image, env, region, databa
                   image: imageName,
                   command: ["npm"],
                   args: ["run", "seed"],
+                  // DIGEST is used to force Cloud Run to create a new revision when the image changes,
+                  // even if the tag name (e.g. :latest) stays the same.
                   envs: [
                     { name: "NODE_ENV", value: env },
                     { name: "DIGEST", value: imageDigest.slice(-71) },
@@ -195,11 +217,14 @@ function createCloudRunSeedJobWithSqlSocket(baseName, image, env, region, databa
             }
           }
         },
-        { provider, dependsOn: [jobSaCloudSqlClient, jobSaLogWriter] }
+        {
+          provider,
+          dependsOn: [enableRunApi, enableIamApi, jobSaCloudSqlClient, jobSaLogWriter]
+        }
       );
     });
 
-  // Return the job name (e.g. "notes-seed-job")
+  // 5. Return the job name (e.g. "notes-seed-job")
   return job.name;
 }
 
