@@ -6,7 +6,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { createPublicPostgresInstanceLockedDown } = require("../modules/cloud-sql");
-const { deployPublicCloudRunWithSqlSocket } = require("../modules/cloud-run");
+const { deployPublicCloudRunWithSqlSocket, createCloudRunSeedJobWithSqlSocket } = require("../modules/cloud-run");
 
 // 1. Load Pulumi and GCP configuration values used across the deployment.
 const config = new pulumi.Config();
@@ -60,15 +60,27 @@ const cloudRunUrl = deployPublicCloudRunWithSqlSocket(
   image,
   env,
   region,
-  projectNumber,
   postgres.databaseUrl,
   postgres.connectionName,
   provider
 );
 
-// 7. Export stack outputs to view and reuse configuration values from the Pulumi CLI or other stacks.
+// 7. Create a Cloud Run Job that runs "npm run seed" against the same database.
+const seedJobName = createCloudRunSeedJobWithSqlSocket(
+  "notes",
+  image,
+  env,
+  region,
+  postgres.databaseUrl,
+  postgres.connectionName,
+  provider
+);
+
+// 8. Export stack outputs to view and reuse configuration values from the Pulumi CLI or other stacks.
 exports.env = env;
 exports.project = project;
 exports.region = region;
 exports.zone = zone;
 exports.cloudRunUrl = cloudRunUrl;
+exports.databaseUrl = postgres.databaseUrl;
+exports.seedJobName = seedJobName;

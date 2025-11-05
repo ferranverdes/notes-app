@@ -16,23 +16,13 @@ const pulumi = require("@pulumi/pulumi");
  * @param {pulumi.Output<string>} image        container image info (expects .imageName and .repoDigest)
  * @param {string} env                         environment name (e.g. "development")
  * @param {string} region                      Google Cloud region (e.g. "europe-west1")
- * @param {string} projectNumber               Google Cloud numeric project ID
  * @param {pulumi.Output<string>|string} databaseUrl  full DATABASE_URL for the app
  * @param {pulumi.Output<string>|string} connectionName Cloud SQL connection name "<project>:<region>:<instance>"
  * @param {gcp.Provider} provider              Pulumi GCP provider for authentication
  *
  * @returns {pulumi.Output<string>}            public HTTPS URL of the deployed Cloud Run service
  */
-function deployPublicCloudRunWithSqlSocket(
-  baseName,
-  image,
-  env,
-  region,
-  projectNumber,
-  databaseUrl,
-  connectionName,
-  provider
-) {
+function deployPublicCloudRunWithSqlSocket(baseName, image, env, region, databaseUrl, connectionName, provider) {
   // 1. Enable required Google Cloud APIs (Cloud Run and IAM)
   const enableRunApi = new gcp.projects.Service(
     `${baseName}-enable-run`,
@@ -129,4 +119,91 @@ function deployPublicCloudRunWithSqlSocket(
   return service.uri;
 }
 
-module.exports = { deployPublicCloudRunWithSqlSocket };
+/**
+ * Create a Cloud Run Job that runs "npm run seed" against the same database
+ * using a Cloud SQL Unix socket.
+ *
+ * @param {string} baseName
+ * @param {{ imageName: pulumi.Input<string>, repoDigest: pulumi.Input<string> }} image
+ * @param {string} env
+ * @param {string} region
+ * @param {pulumi.Output<string>|string} databaseUrl
+ * @param {pulumi.Output<string>|string} connectionName
+ * @param {gcp.Provider} provider
+ *
+ * @returns {pulumi.Output<string>}   Name of the Cloud Run job
+ */
+function createCloudRunSeedJobWithSqlSocket(baseName, image, env, region, databaseUrl, connectionName, provider) {
+  // Separate service account for the seed job
+  const jobServiceAccount = new gcp.serviceaccount.Account(
+    `${baseName}-sa-cloud-run-seed`,
+    {
+      accountId: `${baseName}-sa-cloud-run-seed`,
+      displayName: pulumi.interpolate`${baseName} Cloud Run seed job service account`
+    },
+    { provider }
+  );
+
+  const jobSaCloudSqlClient = new gcp.projects.IAMMember(
+    `${baseName}-seed-sa-cloudsql-client`,
+    {
+      project: provider.project,
+      role: "roles/cloudsql.client",
+      member: pulumi.interpolate`serviceAccount:${jobServiceAccount.email}`
+    },
+    { provider, dependsOn: [jobServiceAccount] }
+  );
+
+  const jobSaLogWriter = new gcp.projects.IAMMember(
+    `${baseName}-seed-sa-log-writer`,
+    {
+      project: provider.project,
+      role: "roles/logging.logWriter",
+      member: pulumi.interpolate`serviceAccount:${jobServiceAccount.email}`
+    },
+    { provider, dependsOn: [jobServiceAccount] }
+  );
+
+  const job = pulumi
+    .all([image.imageName, image.repoDigest, databaseUrl, connectionName, jobServiceAccount.email])
+    .apply(([imageName, imageDigest, dbUrl, connName, saEmail]) => {
+      return new gcp.cloudrunv2.Job(
+        `${baseName}-seed-job`,
+        {
+          name: `${baseName}-seed-job`,
+          location: region,
+          template: {
+            template: {
+              serviceAccount: saEmail,
+              containers: [
+                {
+                  image: imageName,
+                  command: ["npm"],
+                  args: ["run", "seed"],
+                  envs: [
+                    { name: "NODE_ENV", value: env },
+                    { name: "DIGEST", value: imageDigest.slice(-71) },
+                    { name: "DATABASE_URL", value: dbUrl }
+                  ],
+                  volumeMounts: [{ name: "cloudsql", mountPath: "/cloudsql" }],
+                  resources: {
+                    limits: { cpu: "1", memory: "512Mi" }
+                  }
+                }
+              ],
+              volumes: [{ name: "cloudsql", cloudSqlInstance: { instances: [connName] } }]
+            }
+          }
+        },
+        { provider, dependsOn: [jobSaCloudSqlClient, jobSaLogWriter] }
+      );
+    });
+
+  // Return the job name (e.g. "notes-seed-job")
+  return job.name;
+}
+
+module.exports = {
+  deployPublicCloudRunWithSqlSocket,
+  createCloudRunSeedJobWithSqlSocket
+};

@@ -15,6 +15,9 @@ async function seed() {
     // Remove existing data to ensure a clean state
     await prisma.note.deleteMany();
 
+    // Reset autoincrement sequence
+    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Note_id_seq" RESTART WITH 1`);
+
     // Generate fake notes
     const notes = Array.from({ length: 5 }, () => ({
       title: faker.lorem.sentence(),

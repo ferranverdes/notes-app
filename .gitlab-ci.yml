@@ -21,9 +21,7 @@ test:
 
 build:
   stage: build
-  image:
-    name: pulumi/pulumi:3.205.0
-    entrypoint: [""] # overrides the image ENTRYPOINT, allowing GitLab to execute commands through /bin/sh
+  image: pulumi/pulumi-nodejs:3.205.0
   services:
     - docker:28.5.1-dind
   variables:
@@ -53,9 +51,7 @@ build:
 
 deploy:
   stage: deploy
-  image:
-    name: pulumi/pulumi:3.205.0
-    entrypoint: [""]
+  image: pulumi/pulumi-nodejs:3.205.0
   needs:
     - job: build # allows this job to start as soon as 'build' finishes and access its artifacts
   cache:
@@ -74,3 +70,27 @@ deploy:
     - npm ci --cache .npm --prefer-offline
     - pulumi stack select dev
     - pulumi up --yes
+    - PROJECT=$(pulumi stack output project)
+    - REGION=$(pulumi stack output region)
+    - JOB_NAME=$(pulumi stack output seedJobName)
+    - echo "GCP_PROJECT=$PROJECT" > deploy.env
+    - echo "GCP_REGION=$REGION" >> deploy.env
+    - echo "SEED_JOB_NAME=$JOB_NAME" >> deploy.env
+  artifacts:
+    reports:
+      dotenv: environments/deploy/deploy.env
+
+seed:
+  stage: deploy
+  image: google/cloud-sdk:546.0.0-slim
+  needs:
+    - job: deploy
+  before_script:
+    - cd environments
+    - echo "$GOOGLE_CREDENTIALS" > ./credentials/service-account-key.json
+    - gcloud auth activate-service-account --key-file=./credentials/service-account-key.json
+    - gcloud config set project "$GCP_PROJECT"
+  script:
+    - gcloud run jobs execute "$SEED_JOB_NAME" --region="$GCP_REGION" --wait
+  allow_failure: false # fail pipeline if seeding fails
+  when: on_success # run automatically after successful deploy
