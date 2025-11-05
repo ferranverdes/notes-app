@@ -1,0 +1,4 @@
+config:
+  gcp:project: notes-stage-283732
+  gcp:region: europe-west1
+  env: staging

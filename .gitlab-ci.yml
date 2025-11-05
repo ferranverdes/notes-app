@@ -26,7 +26,7 @@ build:
   stage: build
   image: pulumi/pulumi-nodejs:3.205.0
   environment:
-    name: $BRANCH_NAME
+    name: $BRANCH_NAME # defines the deployment environment (dev, stage, prod) so GitLab injects environment-scoped variables
   services:
     - docker:28.5.1-dind
   variables:
@@ -53,7 +53,7 @@ build:
   artifacts: # define files to be passed between jobs (e.g. env vars, binaries, reports)
     reports:
       dotenv: environments/build/build.env
-  only:
+  only: # run this job only for these branches (dev, stage, prod)
     - dev
     - stage
     - prod

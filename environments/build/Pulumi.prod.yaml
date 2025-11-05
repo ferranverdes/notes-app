@@ -1,0 +1,4 @@
+config:
+  gcp:project: notes-prod-911203
+  gcp:region: europe-west1
+  env: production

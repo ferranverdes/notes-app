@@ -14,7 +14,6 @@ const env = config.require("env");
 
 const gcpConfig = new pulumi.Config("gcp");
 const project = gcpConfig.require("project");
-const projectNumber = gcpConfig.require("projectNumber");
 const region = gcpConfig.require("region");
 const zone = gcpConfig.get("zone") || "europe-west1-b";
 
