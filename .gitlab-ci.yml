@@ -1,5 +1,8 @@
 stages: [test, build, deploy]
 
+variables:
+  BRANCH_NAME: "$CI_COMMIT_REF_NAME"
+
 test:
   stage: test
   image: node:22-alpine
@@ -22,6 +25,8 @@ test:
 build:
   stage: build
   image: pulumi/pulumi-nodejs:3.205.0
+  environment:
+    name: $BRANCH_NAME
   services:
     - docker:28.5.1-dind
   variables:
@@ -41,17 +46,23 @@ build:
     - cd build
   script:
     - npm ci --cache .npm --prefer-offline
-    - pulumi stack select dev
+    - pulumi stack select "$BRANCH_NAME"
     - pulumi up --yes
     - echo "IMAGE_NAME=$(pulumi stack output imageName)" > build.env
     - echo "IMAGE_DIGEST=$(pulumi stack output repoDigest)" >> build.env
   artifacts: # define files to be passed between jobs (e.g. env vars, binaries, reports)
     reports:
       dotenv: environments/build/build.env
+  only:
+    - dev
+    - stage
+    - prod
 
 deploy:
   stage: deploy
   image: pulumi/pulumi-nodejs:3.205.0
+  environment:
+    name: $BRANCH_NAME
   needs:
     - job: build # allows this job to start as soon as 'build' finishes and access its artifacts
   cache:
@@ -68,7 +79,7 @@ deploy:
     - cd deploy
   script:
     - npm ci --cache .npm --prefer-offline
-    - pulumi stack select dev
+    - pulumi stack select "$BRANCH_NAME"
     - pulumi up --yes
     - PROJECT=$(pulumi stack output project)
     - REGION=$(pulumi stack output region)
@@ -79,10 +90,16 @@ deploy:
   artifacts:
     reports:
       dotenv: environments/deploy/deploy.env
+  only:
+    - dev
+    - stage
+    - prod
 
 seed:
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
+  environment:
+    name: $BRANCH_NAME
   needs:
     - job: deploy
   before_script:
@@ -94,3 +111,5 @@ seed:
     - gcloud run jobs execute "$SEED_JOB_NAME" --region="$GCP_REGION" --wait
   allow_failure: false # fail pipeline if seeding fails
   when: on_success # run automatically after successful deploy
+  only:
+    - dev
