@@ -36,7 +36,7 @@ build:
     policy: pull-push
   before_script:
     - cd environments
-    - echo "$GOOGLE_CREDENTIALS" > ./credentials/service-account-key.json
+    - echo "$GOOGLE_CREDENTIALS_B64" | base64 -d > ./credentials/service-account-key.json
     - export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials/service-account-key.json"
     - cd build
   script:
@@ -63,7 +63,7 @@ deploy:
     policy: pull-push
   before_script:
     - cd environments
-    - echo "$GOOGLE_CREDENTIALS" > ./credentials/service-account-key.json
+    - echo "$GOOGLE_CREDENTIALS_B64" | base64 -d > ./credentials/service-account-key.json
     - export GOOGLE_APPLICATION_CREDENTIALS="$(pwd)/credentials/service-account-key.json"
     - cd deploy
   script:
@@ -87,7 +87,7 @@ seed:
     - job: deploy
   before_script:
     - cd environments
-    - echo "$GOOGLE_CREDENTIALS" > ./credentials/service-account-key.json
+    - echo "$GOOGLE_CREDENTIALS_B64" | base64 -d > ./credentials/service-account-key.json
     - gcloud auth activate-service-account --key-file=./credentials/service-account-key.json
     - gcloud config set project "$GCP_PROJECT"
   script:
