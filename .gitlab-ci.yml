@@ -113,3 +113,4 @@ seed:
   when: on_success # run automatically after successful deploy
   only:
     - dev
+    - stage

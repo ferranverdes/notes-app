@@ -60,17 +60,28 @@ Each environment needs a service account with permissions to deploy via Pulumi.
 
 4. Generate a **JSON key** and download it to your local machine.
 
+#### 🔒 Additional service account for DAST (staging only)
+
+In the **staging** project, create an extra service account named `gitlab-dast-sa`.  
+This account will be used by GitLab DAST to authenticate and scan your deployed service.
+
+1. Go to **IAM & Admin → Service Accounts → Create service account**.  
+2. Name it `gitlab-dast-sa`.  
+3. Do not assign any role.
+4. Generate a **JSON key** and download it to your local machine.
+
 ### 5️⃣ Store credentials in GitLab (Base64 encoded)
 
-Each environment (dev, stage, prod) needs its own encoded service account key stored in GitLab as a CI/CD variable.
+Each environment (`dev`, `stage`, `prod`) needs its own encoded service account key stored in GitLab as a CI/CD variable.
+The staging environment additionally uses a separate key for DAST scans.
 
-First, encode your JSON key locally:
+First, encode your JSON keys locally:
 
   ```bash
   base64 ~/Downloads/notes-dev-191823-015df9e2cf47.json
   ```
 
-Then, in **GitLab → Settings → CI/CD → Variables**, create one variable per environment. They must be named exactly `dev`, `stage`, and `prod`.
+Then, in **GitLab → Settings → CI/CD → Variables**, create the following variables. Each one must be scoped to its corresponding environment (`dev`, `stage`, or `prod`).
 
 Define the variable for each environment as follows:
 
@@ -78,9 +89,10 @@ Define the variable for each environment as follows:
 |-----|--------------------|-------------|--------|
 | `GOOGLE_CREDENTIALS_B64` | dev | ✅ Masked | 🚫 Unset "Protect variable" |
 | `GOOGLE_CREDENTIALS_B64` | stage | ✅ Masked | 🚫 Unset "Protect variable" |
+| `GOOGLE_CREDENTIALS_DAST_B64` | stage | ✅ Masked | 🚫 Unset "Protect variable" |
 | `GOOGLE_CREDENTIALS_B64` | prod | ✅ Masked | 🚫 Unset "Protect variable" |
 
-This ensures the CI/CD pipeline can use the credentials safely, while keeping them hidden from logs. All variables are left unprotected for demonstration purposes only.
+This setup allows each pipeline environment to access the correct credentials while keeping them hidden from logs. All variables are left unprotected for demonstration purposes only.
 
 ### 6️⃣ Update Pulumi configuration files
 
@@ -121,7 +133,7 @@ feature/*  →  main  →  dev  →  stage  →  prod
 
 Each merge triggers the pipeline for that environment automatically.
 
-### 9️⃣ Manually trigger the first deployment
+### 9️⃣ (Optional) Manually trigger the first deployment
 
 This step is **optional** but recommended to verify your setup before pushing any code to GitLab.
 
@@ -142,6 +154,51 @@ npx -y gitlab-ci-local --privileged \
 
 This will execute the `dev` environment pipeline manually, deploying your stack to Google Cloud.  
 Once successful, you can proceed to test the automated deployments for `stage` and `prod` via GitLab CI/CD.
+
+### 🔟 (Optional) Manually query the staging environment with the DAST service account
+
+Once the staging environment is deployed, you can manually call the Cloud Run service using the `gitlab-dast-sa` service account (the same identity used by GitLab DAST) it has access.
+
+1. Set the Cloud Run URL from the Pulumi output (replace with your actual URL):
+
+    ```bash
+    export CLOUD_RUN_URL="https://notes-service-XXXX-ew.a.run.app"
+    ```
+
+2. Activate the `gitlab-dast-sa` service account locally using its JSON key:
+
+    ```bash
+    gcloud auth activate-service-account \
+      --key-file=~/Downloads/notes-stage-298734-e6485c9ac1ea.json
+    ```
+
+3. Generate an identity token for the Cloud Run service:
+
+    ```bash
+    export ACCESS_TOKEN=$(gcloud auth print-identity-token \
+      --audiences="$CLOUD_RUN_URL")
+    ```
+
+4. Call the staging endpoint with `curl`:
+
+   * List notes:
+
+   ```bash
+   curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+        -H "Content-Type: application/json" \
+        "$CLOUD_RUN_URL/notes"
+   ```
+
+   * Create a new note:
+
+   ```bash
+   curl -X POST "$CLOUD_RUN_URL/notes" \
+     -H "Authorization: Bearer $ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"title":"DAST test", "description":"Testing staging access via gitlab-dast-sa"}'
+   ```
+
+If everything is configured correctly, these requests will succeed even though the Cloud Run service is **not publicly accessible**, because they are authenticated as `gitlab-dast-sa@<staging-project>.iam.gserviceaccount.com`.
 
 ## 💻 Local Development Setup
 

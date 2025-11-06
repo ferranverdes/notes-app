@@ -7,19 +7,21 @@ const { prisma } = require("../../src/prisma");
  *
  * Populates the database with a predefined number of fake Note entries.
  * Existing records in the "Note" table will be deleted before inserting new ones.
+ *
+ * ⚠️ Not intended to be executed in production environments.
  */
 async function seed() {
   console.log("Starting database seed...");
 
   try {
-    // Remove existing data to ensure a clean state
-    await prisma.note.deleteMany();
-
-    // Reset autoincrement sequence
-    await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Note_id_seq" RESTART WITH 1`);
+    // Only clear data if not in staging
+    if (process.env.NODE_ENV !== "staging") {
+      await prisma.note.deleteMany();
+      await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Note_id_seq" RESTART WITH 1`);
+    }
 
     // Generate fake notes
-    const notes = Array.from({ length: 5 }, () => ({
+    const notes = Array.from({ length: 3 }, () => ({
       title: faker.lorem.sentence(),
       description: faker.lorem.paragraph()
     }));
