@@ -1,15 +1,17 @@
 # 🗒️ Notes App with GitLab SCA, SAST and DAST
 
-A minimal REST API built to demonstrate secure, automated deployments on Google Cloud using Pulumi, GitLab CI/CD, and **multi-environment pipelines**.
+A minimal REST API built to demonstrate secure, automated deployments on Google Cloud using Pulumi, GitLab CI/CD, and **multi-environment pipelines**:
+
+![Architecture overview][1]
 
 This project is designed for learning purposes, showcasing how to integrate **GitLab's built-in SCA, SAST**, and **DAST** — helping developers understand how security automation fits into a real DevSecOps workflow.
 
-It exposes two endpoints:
+The app exposes two endpoints:
 
 * **POST `/notes`** → Creates a new note and returns `{ title, description }`.  
 * **GET `/notes`** → Retrieves a list of all existing notes.  
 
-The app is intentionally simple: no validation, no authentication, and no dependencies beyond what is strictly required.
+It is intentionally simple: no validation, no authentication, and no dependencies beyond what is strictly required.
 
 ## ☁️ Cloud Deployment (GitLab + Pulumi + GCP)
 
@@ -133,7 +135,7 @@ feature/*  →  main  →  dev  →  stage  →  prod
 
 Each merge triggers the pipeline for that environment automatically.
 
-### 9️⃣ (Optional) Manually trigger the first deployment
+### (Optional) Manually trigger the first deployment
 
 This step is **optional** but recommended to verify your setup before pushing any code to GitLab.
 
@@ -152,7 +154,7 @@ npx -y gitlab-ci-local run build deploy seed --privileged \
   --variable "GOOGLE_CREDENTIALS_B64=$(base64 environments/credentials/service-account-key.json)"
 ```
 
-### 🔟 (Optional) Manually query the staging environment with the DAST service account
+### (Optional) Manually query the staging environment with the DAST service account
 
 Once the staging environment is deployed, you can manually call the Cloud Run service using the `gitlab-dast-sa` service account (the same identity used by GitLab DAST) it has access.
 
@@ -382,3 +384,5 @@ Once configured:
 4. (Soon) Get security scan reports directly from your GitLab pipelines.
 
 This project is designed for learning purposes, showing how to combine **cloud deployments**, **infrastructure as code**, and **security automation** — all within a modern, developer-friendly workflow.
+
+[1]: https://gitlab.com/ferran.verdes/static/-/raw/main/images/notes-app-with-gitlab-sca-sast-and-dast-architecture-overview.png
