@@ -53,7 +53,7 @@ Create them in **Google Cloud Console → Manage Resources → Create Project**.
 Each environment needs a service account with permissions to deploy via Pulumi.
 
 1. Go to **IAM & Admin → Service Accounts → Create service account**.  
-2. Name it `builder`.  
+2. Name it `gitlab-build-sa`.  
 3. Assign the following role:
 
     * `Owner` (for demonstration purposes only — in real-world scenarios, grant the minimum roles required).  

@@ -64,16 +64,19 @@ const cloudRunUrl = deployPublicCloudRunWithSqlSocket(
   provider
 );
 
-// 7. Create a Cloud Run Job that runs "npm run seed" against the same database.
-const seedJobName = createCloudRunSeedJobWithSqlSocket(
-  "notes",
-  image,
-  env,
-  region,
-  postgres.databaseUrl,
-  postgres.connectionName,
-  provider
-);
+// 7. Create a Cloud Run Job only if the environment is not production.
+let seedJobName = pulumi.output("N/A (not created in prod environment)");
+if (env !== "production") {
+  seedJobName = createCloudRunSeedJobWithSqlSocket(
+    "notes",
+    image,
+    env,
+    region,
+    postgres.databaseUrl,
+    postgres.connectionName,
+    provider
+  );
+}
 
 // 8. Export stack outputs to view and reuse configuration values from the Pulumi CLI or other stacks.
 exports.env = env;
@@ -81,5 +84,4 @@ exports.project = project;
 exports.region = region;
 exports.zone = zone;
 exports.cloudRunUrl = cloudRunUrl;
-exports.databaseUrl = postgres.databaseUrl;
 exports.seedJobName = seedJobName;

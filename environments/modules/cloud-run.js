@@ -108,12 +108,35 @@ function deployPublicCloudRunWithSqlSocket(baseName, image, env, region, databas
       );
     });
 
-  // 5. Make the Cloud Run service public (roles/run.invoker for allUsers)
-  const publicInvoker = new gcp.cloudrunv2.ServiceIamMember(
-    `${baseName}-public-invoker`,
-    { name: service.name, location: region, role: "roles/run.invoker", member: "allUsers" },
-    { provider }
-  );
+  // 5. Grant Cloud Run invocation rights based on environment, restricting or allowing access as needed
+  if (env === "development") {
+    // TODO: Grant roles/run.invoker to the developer IAM group for this service in the development environment.
+    // Intentionally no ServiceIamMember is created here to keep the service non-invokable by default.
+  } else if (env === "staging") {
+    new gcp.cloudrunv2.ServiceIamMember(
+      `${baseName}-staging-dast-invoker`,
+      {
+        name: service.name,
+        location: region,
+        role: "roles/run.invoker",
+        member: pulumi.interpolate`serviceAccount:gitlab-dast-sa@${provider.project}.iam.gserviceaccount.com`
+      },
+      { provider }
+    );
+
+    // TODO: Also grant roles/run.invoker to the developer IAM group for this service in the staging environment.
+  } else if (env === "production") {
+    new gcp.cloudrunv2.ServiceIamMember(
+      `${baseName}-public-invoker`,
+      {
+        name: service.name,
+        location: region,
+        role: "roles/run.invoker",
+        member: "allUsers"
+      },
+      { provider }
+    );
+  }
 
   // 6. Return the public URL of the deployed service
   return service.uri;
