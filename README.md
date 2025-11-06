@@ -144,16 +144,13 @@ To do this, you can temporarily copy your **development environment** JSON key t
 cp ~/Downloads/notes-dev-191823-015df9e2cf47.json environments/credentials/service-account-key.json
 ```
 
-Then, run the following command to trigger the deployment locally:
+Then, run the following command to trigger the deployment locally. It will execute the `build`, `deploy`, and `seed` stages, deploying your stack to Google Cloud:
 
 ```bash
-npx -y gitlab-ci-local --privileged \
+npx -y gitlab-ci-local run build deploy seed --privileged \
   --variable "PULUMI_ACCESS_TOKEN=<your-pulumi-token>" \
   --variable "GOOGLE_CREDENTIALS_B64=$(base64 environments/credentials/service-account-key.json)"
 ```
-
-This will execute the `dev` environment pipeline manually, deploying your stack to Google Cloud.  
-Once successful, you can proceed to test the automated deployments for `stage` and `prod` via GitLab CI/CD.
 
 ### 🔟 (Optional) Manually query the staging environment with the DAST service account
 
