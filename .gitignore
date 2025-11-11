@@ -170,9 +170,13 @@ test.db
 # Service account key used within the GCP project to deploy resources
 service-account-key.json
 
-# GitLab CI Local folder
+# GitLab CI local runs
 .gitlab-ci-local/
+.gitlab-ci-local-variables.yml
 
-# GitLab CI stages environment variables
+## Stages outputs
 build.env
 deploy.env
+
+## Dependency scanning
+gl-sbom-npm-npm.cdx.json
