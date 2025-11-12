@@ -1,4 +1,4 @@
-# .gitlab/extended-gitleaks-config.toml
+# extended-gitleaks-config.toml
 [extend]
 # Extends default packaged ruleset, NOTE: do not change the path.
 path = "/gitleaks.toml"
