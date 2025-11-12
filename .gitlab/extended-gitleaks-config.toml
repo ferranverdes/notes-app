@@ -1,0 +1,10 @@
+# .gitlab/extended-gitleaks-config.toml
+[extend]
+# Extends default packaged ruleset, NOTE: do not change the path.
+path = "/gitleaks.toml"
+
+[[rules]]
+  id = "dbpassword-assignment"
+  description = "Detects hardcoded dbPassword assignments"
+  # very simple case-insensitive regex for demonstration
+  regex = '''(?i)dbpassword'''
