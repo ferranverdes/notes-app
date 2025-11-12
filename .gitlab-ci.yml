@@ -14,10 +14,8 @@ variables:
 
 gemnasium-dependency_scanning:
   variables:
-    DS_SCAN_PATHS: "app,environments"
-    DS_MAX_DEPTH: 15
+    DS_MAX_DEPTH: -1 # scan all directories
     DS_EXCLUDED_PATHS: "**/node_modules/**,**/dist/**,**/build/**"
-    DS_INCLUDE_DEV_DEPENDENCIES: "true"
     DS_REMEDIATE: "false" # do not try to generate MRs with fixes
 
 secret_detection:
@@ -27,7 +25,6 @@ secret_detection:
 
 semgrep-sast:
   variables:
-    SAST_INCLUDED_PATHS: "app/**,environments/**" # target app and Pulumi IaC code
     SAST_EXCLUDED_PATHS: "node_modules/**" # do not waste time on deps/build outputs
 
 kics-iac-sast:
