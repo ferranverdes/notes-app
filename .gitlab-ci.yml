@@ -15,7 +15,7 @@ variables:
 gemnasium-dependency_scanning:
   variables:
     DS_MAX_DEPTH: -1 # scan all directories
-    DS_EXCLUDED_PATHS: "**/node_modules/**,**/dist/**,**/build/**"
+    DS_EXCLUDED_PATHS: "**/node_modules/**,**/dist/**,**/build/**" # do not waste time on deps/build outputs
     DS_REMEDIATE: "false" # do not try to generate MRs with fixes
 
 secret_detection:
@@ -25,11 +25,10 @@ secret_detection:
 
 semgrep-sast:
   variables:
-    SAST_EXCLUDED_PATHS: "node_modules/**" # do not waste time on deps/build outputs
+    SAST_EXCLUDED_PATHS: "node_modules/**"
 
 kics-iac-sast:
   variables:
-    IAC_SCAN_PATHS: "environments,Dockerfile"# # target Pulumi IaC and app Dockerfile 
     SEARCH_MAX_DEPTH: 15
     SAST_EXCLUDED_PATHS: "node_modules/**"
 
