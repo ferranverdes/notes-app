@@ -8,4 +8,3 @@ path = "/gitleaks.toml"
   description = "Detects hardcoded dbPassword assignments"
   # very simple case-insensitive regex for demonstration
   regex = '''(?i)dbpassword'''
-  path = '''^(app|environments)/'''
