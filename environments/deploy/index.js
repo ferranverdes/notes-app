@@ -43,6 +43,7 @@ const provider = new gcp.Provider("gcp-provider", {
 });
 
 // 5. Create a locked-down Cloud SQL PostgreSQL instance accessible only through Cloud Run socket.
+// ⚠️ WARNING: The username must be defined as a GitLab CI/CD pipeline variable and never hardcoded directly in the source code.
 const postgres = createPublicPostgresInstanceLockedDown({
   baseName: "notes-sql",
   project,

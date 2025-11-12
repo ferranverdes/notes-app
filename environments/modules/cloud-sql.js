@@ -79,6 +79,7 @@ function createPublicPostgresInstanceLockedDown({ baseName, project, region, tie
   );
 
   // 4. Create the application user (password should later come from secret config, not hardcoded)
+  // ⚠️ WARNING: The dbPassword must be defined as a GitLab CI/CD pipeline variable and never hardcoded directly in the source code.
   const dbPassword = "TempPass123!";
   const user = new gcp.sql.User(
     `${baseName}-user`,

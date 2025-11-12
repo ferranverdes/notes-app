@@ -1,10 +1,41 @@
-stages: [test, build, deploy]
+stages:
+  - test
+  - build
+  - deploy
+
+include:
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml # gemnasium-dependency_scanning
+  - template: Jobs/Secret-Detection.gitlab-ci.yml # secret_detection
+  - template: Jobs/SAST.gitlab-ci.yml # semgrep-sast
+  - template: Jobs/SAST-IaC.gitlab-ci.yml # kics-iac-sast
 
 variables:
   BRANCH_NAME: "$CI_COMMIT_REF_NAME"
 
-include:
-  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+gemnasium-dependency_scanning:
+  variables:
+    DS_SCAN_PATHS: "app,environments"
+    DS_MAX_DEPTH: 15
+    DS_EXCLUDED_PATHS: "**/node_modules/**,**/dist/**,**/build/**"
+    DS_INCLUDE_DEV_DEPENDENCIES: "true"
+    DS_REMEDIATE: "false" # do not try to generate MRs with fixes
+
+secret_detection:
+  variables:
+    SECRET_DETECTION_SCAN_PATHS: "app,environments"
+    SECRET_DETECTION_HISTORIC_SCAN: "false" # fast per-commit scans
+    SECRET_DETECTION_RULESET: "true" # enable custom rules
+
+semgrep-sast:
+  variables:
+    SAST_INCLUDED_PATHS: "app/**,environments/**" # target app and Pulumi IaC code
+    SAST_EXCLUDED_PATHS: "node_modules/**" # do not waste time on deps/build outputs
+
+kics-iac-sast:
+  variables:
+    IAC_SCAN_PATHS: "environments,Dockerfile"# # target Pulumi IaC and app Dockerfile 
+    SEARCH_MAX_DEPTH: 15
+    SAST_EXCLUDED_PATHS: "node_modules/**"
 
 test:
   stage: test
@@ -98,7 +129,7 @@ deploy:
     - stage
     - prod
 
-seed:
+seed: # triggers a Cloud Run job that inserts fake data into the database
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
   environment:

@@ -178,5 +178,8 @@ service-account-key.json
 build.env
 deploy.env
 
-## Dependency scanning
+## Scanning reports
+gl-dependency-scanning-report.json
 gl-sbom-npm-npm.cdx.json
+gl-secret-detection-report.json
+gl-sast-report.json
