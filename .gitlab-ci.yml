@@ -22,9 +22,8 @@ gemnasium-dependency_scanning:
 
 secret_detection:
   variables:
-    SECRET_DETECTION_SCAN_PATHS: "app/**,environments/**"
+    SECRET_DETECTION_EXCLUDED_PATHS: "node_modules/**"
     SECRET_DETECTION_HISTORIC_SCAN: "false" # fast per-commit scans
-    SECRET_DETECTION_RULESET: "true" # enable custom rules
 
 semgrep-sast:
   variables:
