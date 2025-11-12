@@ -2,12 +2,14 @@ stages:
   - test
   - build
   - deploy
+  - dast
 
 include:
   - template: Jobs/Dependency-Scanning.gitlab-ci.yml # gemnasium-dependency_scanning
   - template: Jobs/Secret-Detection.gitlab-ci.yml # secret_detection
   - template: Jobs/SAST.gitlab-ci.yml # semgrep-sast
   - template: Jobs/SAST-IaC.gitlab-ci.yml # kics-iac-sast
+  - template: Security/DAST.gitlab-ci.yml # DAST (ZAP-based)
 
 variables:
   BRANCH_NAME: "$CI_COMMIT_REF_NAME"
@@ -29,7 +31,7 @@ semgrep-sast:
 
 kics-iac-sast:
   variables:
-    SEARCH_MAX_DEPTH: 15
+    SEARCH_MAX_DEPTH: 5 # number of directory levels the analyzer descends into when searching for matching files to scan
     SAST_EXCLUDED_PATHS: "node_modules/**"
 
 test:
@@ -116,6 +118,7 @@ deploy:
     - echo "GCP_PROJECT=$PROJECT" > deploy.env
     - echo "GCP_REGION=$REGION" >> deploy.env
     - echo "SEED_JOB_NAME=$JOB_NAME" >> deploy.env
+    - echo "CLOUD_RUN_URL=$CLOUD_URL" >> deploy.env
   artifacts:
     reports:
       dotenv: environments/deploy/deploy.env
@@ -142,4 +145,16 @@ seed: # triggers a Cloud Run job that inserts fake data into the database
   when: on_success # run automatically after successful deploy
   only:
     - dev
+    - stage
+
+dast:
+  stage: dast
+  needs:
+    - job: deploy
+  variables:
+    DAST_WEBSITE: "$CLOUD_RUN_URL"
+    DAST_FULL_SCAN_ENABLED: "false"
+    DAST_BROWSER_SCAN: "true"
+    DAST_EXCLUDE_PATHS: ""
+  only:
     - stage
