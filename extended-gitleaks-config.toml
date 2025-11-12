@@ -6,5 +6,4 @@ path = "/gitleaks.toml"
 [[rules]]
   id = "dbpassword-assignment"
   description = "Detects hardcoded dbPassword assignments"
-  # very simple case-insensitive regex for demonstration
-  regex = '''(?i)dbpassword'''
+  regex = '''(?i)\bdbpassword\b\s*[:=]\s*["'][^"']+["']'''
