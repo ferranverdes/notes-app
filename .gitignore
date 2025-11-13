@@ -177,9 +177,12 @@ service-account-key.json
 ## Stages outputs
 build.env
 deploy.env
+headers.env
 
 ## Scanning reports
 gl-dependency-scanning-report.json
 gl-sbom-npm-npm.cdx.json
 gl-secret-detection-report.json
 gl-sast-report.json
+gl-dast-crawl-graph.svg
+gl-dast-report.json

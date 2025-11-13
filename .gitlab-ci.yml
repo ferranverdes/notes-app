@@ -9,10 +9,7 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml # secret_detection
   - template: Jobs/SAST.gitlab-ci.yml # semgrep-sast
   - template: Jobs/SAST-IaC.gitlab-ci.yml # kics-iac-sast
-  - template: Security/DAST.gitlab-ci.yml # DAST (ZAP-based)
-
-variables:
-  BRANCH_NAME: "$CI_COMMIT_REF_NAME"
+  - template: Security/API-Security.gitlab-ci.yml # DAST API
 
 gemnasium-dependency_scanning:
   variables:
@@ -57,7 +54,7 @@ build:
   stage: build
   image: pulumi/pulumi-nodejs:3.205.0
   environment:
-    name: $BRANCH_NAME # defines the deployment environment (dev, stage, prod) so GitLab injects environment-scoped variables
+    name: $CI_COMMIT_BRANCH # defines the deployment environment (dev, stage, prod) so GitLab injects environment-scoped variables
   services:
     - docker:28.5.1-dind
   variables:
@@ -77,7 +74,7 @@ build:
     - cd build
   script:
     - npm ci --cache .npm --prefer-offline
-    - pulumi stack select "$BRANCH_NAME" || pulumi stack init "$BRANCH_NAME" --non-interactive # temporary safeguard — remove 'stack init' once all env stacks are created
+    - pulumi stack select "$CI_COMMIT_BRANCH" || pulumi stack init "$CI_COMMIT_BRANCH" --non-interactive # temporary safeguard — remove 'stack init' once all env stacks are created
     - pulumi up --yes
     - echo "IMAGE_NAME=$(pulumi stack output imageName)" > build.env
     - echo "IMAGE_DIGEST=$(pulumi stack output repoDigest)" >> build.env
@@ -93,7 +90,7 @@ deploy:
   stage: deploy
   image: pulumi/pulumi-nodejs:3.205.0
   environment:
-    name: $BRANCH_NAME
+    name: $CI_COMMIT_BRANCH
   needs:
     - job: build # allows this job to start as soon as 'build' finishes and access its artifacts
   cache:
@@ -110,15 +107,12 @@ deploy:
     - cd deploy
   script:
     - npm ci --cache .npm --prefer-offline
-    - pulumi stack select "$BRANCH_NAME" || pulumi stack init "$BRANCH_NAME" --non-interactive # temporary safeguard — remove 'stack init' once all env stacks are created
+    - pulumi stack select "$CI_COMMIT_BRANCH" || pulumi stack init "$CI_COMMIT_BRANCH" --non-interactive # temporary safeguard — remove 'stack init' once all env stacks are created
     - pulumi up --yes
-    - PROJECT=$(pulumi stack output project)
-    - REGION=$(pulumi stack output region)
-    - JOB_NAME=$(pulumi stack output seedJobName)
-    - echo "GCP_PROJECT=$PROJECT" > deploy.env
-    - echo "GCP_REGION=$REGION" >> deploy.env
-    - echo "SEED_JOB_NAME=$JOB_NAME" >> deploy.env
-    - echo "CLOUD_RUN_URL=$CLOUD_URL" >> deploy.env
+    - echo "GCP_PROJECT=$(pulumi stack output project)" > deploy.env
+    - echo "GCP_REGION=$(pulumi stack output region)" >> deploy.env
+    - echo "SEED_JOB_NAME=$(pulumi stack output seedJobName)" >> deploy.env
+    - echo "CLOUD_RUN_URL=$(pulumi stack output cloudRunUrl)" >> deploy.env
   artifacts:
     reports:
       dotenv: environments/deploy/deploy.env
@@ -131,7 +125,7 @@ seed: # triggers a Cloud Run job that inserts fake data into the database
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
   environment:
-    name: $BRANCH_NAME
+    name: $CI_COMMIT_BRANCH
   needs:
     - job: deploy
   before_script:
@@ -147,14 +141,32 @@ seed: # triggers a Cloud Run job that inserts fake data into the database
     - dev
     - stage
 
-dast:
+dast_headers:
+  stage: dast
+  image: google/cloud-sdk:546.0.0-slim
+  needs:
+    - job: deploy
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "stage"'
+  before_script:
+    - cd environments
+    - echo "$GOOGLE_CREDENTIALS_DAST_B64" | base64 -d > ./credentials/dast-service-account-key.json
+    - gcloud auth activate-service-account --key-file=./credentials/dast-service-account-key.json
+  script:
+    - export ACCESS_TOKEN="$(gcloud auth print-identity-token --audiences="$CLOUD_RUN_URL")"
+    - 'echo "APISEC_REQUEST_HEADERS_BASE64=$(echo "Authorization: Bearer $ACCESS_TOKEN" | base64 -w0)" > headers.env'
+  artifacts:
+    reports:
+      dotenv: environments/headers.env
+
+api_security:
   stage: dast
   needs:
     - job: deploy
+    - job: seed
+    - job: dast_headers
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "stage"'
   variables:
-    DAST_WEBSITE: "$CLOUD_RUN_URL"
-    DAST_FULL_SCAN_ENABLED: "false"
-    DAST_BROWSER_SCAN: "true"
-    DAST_EXCLUDE_PATHS: ""
-  only:
-    - stage
+    APISEC_TARGET_URL: "$CLOUD_RUN_URL"
+    APISEC_REQUEST_HEADERS_BASE64: "$APISEC_REQUEST_HEADERS_BASE64"
