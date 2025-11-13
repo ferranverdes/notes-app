@@ -1,9 +1,11 @@
+# Define the high-level pipeline stages and their execution order
 stages:
   - test
   - build
   - deploy
   - dast
 
+# Reuse predefined GitLab CI templates for common security scans and override default settings
 include:
   - template: Jobs/Dependency-Scanning.gitlab-ci.yml # gemnasium-dependency_scanning
   - template: Jobs/Secret-Detection.gitlab-ci.yml # secret_detection
@@ -31,16 +33,17 @@ kics-iac-sast:
     SEARCH_MAX_DEPTH: 5 # number of directory levels the analyzer descends into when searching for matching files to scan
     SAST_EXCLUDED_PATHS: "node_modules/**"
 
+# Run the automated tests of the application
 test:
   stage: test
   image: node:22-alpine
   variables:
     NODE_ENV: "test"
     DATABASE_URL: "file:./test.db"
-  cache: # reuse deps between pipelines
-    key:
+  cache: # stores files between pipelines to speed up future job runs
+    key: # defines when a cache can be reused or needs to be regenerated
       files: [app/package-lock.json] # refresh cache when lockfile changes
-    paths:
+    paths: # lists the folders that will actually be cached
       - app/node_modules/ # cache installed modules
       - app/.npm/ # cache npm package tarballs
     policy: pull-push # pull existing cache before job; update it after completion
@@ -50,19 +53,20 @@ test:
     - npm ci --cache .npm --prefer-offline # install deps using cached packages when available
     - npm test -- --ci # npm stops parsing flags; runs Jest in CI mode
 
+# Build infrastructure and the app image using Pulumi
 build:
   stage: build
   image: pulumi/pulumi-nodejs:3.205.0
-  rules:
+  rules: # define when this job should run and can set variables per condition
     - if: '$CI_COMMIT_BRANCH == "main"'
       variables: { TARGET_ENV: "stage" }
     - if: '$CI_COMMIT_BRANCH == "dev"'
       variables: { TARGET_ENV: "dev" }
     - if: '$CI_COMMIT_BRANCH == "prod"'
       variables: { TARGET_ENV: "prod" }
-  environment:
-    name: $TARGET_ENV # defines the deployment environment (dev, stage, prod) so GitLab injects environment-scoped variables
-  services:
+  environment: # links this job to a deploy environment in GitLab (dev/stage/prod)
+    name: $TARGET_ENV # defines the deployment environment so GitLab injects environment-scoped variables
+  services: # define extra helper containers available during this job (i.e., Docker)
     - docker:28.5.1-dind
   variables:
     DOCKER_TLS_CERTDIR: "" # disable TLS → simpler for local DinD
@@ -81,14 +85,15 @@ build:
     - cd build
   script:
     - npm ci --cache .npm --prefer-offline
-    - pulumi stack select "$CI_COMMIT_BRANCH" || pulumi stack init "$CI_COMMIT_BRANCH" --non-interactive # temporary safeguard — remove 'stack init' once all env stacks are created
+    - pulumi stack select "$CI_COMMIT_BRANCH" || pulumi stack init "$CI_COMMIT_BRANCH" --non-interactive # temporary safeguard! remove 'stack init' once all env stacks are created
     - pulumi up --yes
     - echo "IMAGE_NAME=$(pulumi stack output imageName)" > build.env
     - echo "IMAGE_DIGEST=$(pulumi stack output repoDigest)" >> build.env
   artifacts: # define files to be passed between jobs (e.g. env vars, binaries, reports)
-    reports:
-      dotenv: environments/build/build.env
+    reports: # mark artifacts that GitLab can parse or reuse in a special way
+      dotenv: environments/build/build.env # tells GitLab to load env vars from this file into downstream jobs
 
+# Deploy the previously built artifacts/infrastructure
 deploy:
   stage: deploy
   image: pulumi/pulumi-nodejs:3.205.0
@@ -101,7 +106,7 @@ deploy:
       variables: { TARGET_ENV: "prod" }
   environment:
     name: $TARGET_ENV
-  needs:
+  needs: # declares dependencies so this job can use artifacts from others and run earlier
     - job: build # allows this job to start as soon as 'build' finishes and access its artifacts
   cache:
     key:
@@ -117,7 +122,7 @@ deploy:
     - cd deploy
   script:
     - npm ci --cache .npm --prefer-offline
-    - pulumi stack select "$CI_COMMIT_BRANCH" || pulumi stack init "$CI_COMMIT_BRANCH" --non-interactive # temporary safeguard — remove 'stack init' once all env stacks are created
+    - pulumi stack select "$CI_COMMIT_BRANCH" || pulumi stack init "$CI_COMMIT_BRANCH" --non-interactive # temporary safeguard! remove 'stack init' once all env stacks are created
     - pulumi up --yes
     - echo "GCP_PROJECT=$(pulumi stack output project)" > deploy.env
     - echo "GCP_REGION=$(pulumi stack output region)" >> deploy.env
@@ -127,7 +132,8 @@ deploy:
     reports:
       dotenv: environments/deploy/deploy.env
 
-seed_database: # triggers a Cloud Run job that inserts fake data into the database
+# Trigger a Cloud Run job that inserts fake data into the database
+seed_database:
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
   rules:
@@ -147,6 +153,7 @@ seed_database: # triggers a Cloud Run job that inserts fake data into the databa
   script:
     - gcloud run jobs execute "$SEED_JOB_NAME" --region="$GCP_REGION" --wait
 
+# Generate the OpenAPI specification from the application code so DAST can use it
 generate_openapi:
   stage: deploy
   image: node:22-alpine
@@ -161,6 +168,7 @@ generate_openapi:
     paths:
       - app/docs/openapi.json
 
+# Prepare authenticated headers so the DAST API-Security scan can call the protected API (IAM-based access is applied)
 dast_headers:
   stage: dast
   image: google/cloud-sdk:546.0.0-slim
@@ -181,6 +189,7 @@ dast_headers:
     reports:
       dotenv: environments/headers.env
 
+# Run the GitLab API-Security (DAST for APIs) scan against the deployed Cloud Run service
 api_security:
   stage: dast
   rules:
