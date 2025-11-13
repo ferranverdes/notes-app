@@ -9,7 +9,7 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml # secret_detection
   - template: Jobs/SAST.gitlab-ci.yml # semgrep-sast
   - template: Jobs/SAST-IaC.gitlab-ci.yml # kics-iac-sast
-  - template: Security/API-Security.gitlab-ci.yml # DAST API
+  - template: Security/API-Security.gitlab-ci.yml # api_security
 
 gemnasium-dependency_scanning:
   variables:
@@ -121,20 +121,6 @@ deploy:
     - stage
     - prod
 
-generate_openapi:
-  stage: deploy
-  image: node:22-alpine
-  before_script:
-    - cd app
-    - npm ci --prefer-offline
-  script:
-    - npm run generate:openapi
-  artifacts:
-    paths:
-      - app/docs/openapi.json
-  only:
-    - stage
-
 seed_database: # triggers a Cloud Run job that inserts fake data into the database
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
@@ -155,11 +141,25 @@ seed_database: # triggers a Cloud Run job that inserts fake data into the databa
     - dev
     - stage
 
+generate_openapi:
+  stage: deploy
+  image: node:22-alpine
+  before_script:
+    - cd app
+    - npm ci --prefer-offline
+  script:
+    - npm run generate:openapi
+  artifacts:
+    paths:
+      - app/docs/openapi.json
+  only:
+    - stage
+
 dast_headers:
   stage: dast
   image: google/cloud-sdk:546.0.0-slim
   environment:
-    name: $CI_COMMIT_BRANCH
+    name: stage
   needs:
     - job: deploy
   rules:
@@ -187,3 +187,22 @@ api_security:
   variables:
     APISEC_TARGET_URL: "$CLOUD_RUN_URL"
     APISEC_OPENAPI: "app/docs/openapi.json"
+
+ingest_dast_report:
+  stage: dast
+  image: alpine:3.20
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  needs:
+    - project: $CI_PROJECT_PATH
+      ref: stage
+      job: api_security
+      artifacts: true
+  script:
+    - test -f gl-api-security-report.json # check that the report file exists
+  artifacts:
+    reports:
+      dast: gl-api-security-report.json
+    paths:
+      - gl-api-security-report.json
+      - gl-assets/

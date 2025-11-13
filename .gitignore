@@ -189,3 +189,5 @@ gl-secret-detection-report.json
 gl-sast-report.json
 gl-dast-crawl-graph.svg
 gl-dast-report.json
+gl-api-security-report.json
+gl-assets/
