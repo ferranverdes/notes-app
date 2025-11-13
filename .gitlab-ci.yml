@@ -144,6 +144,8 @@ seed: # triggers a Cloud Run job that inserts fake data into the database
 dast_headers:
   stage: dast
   image: google/cloud-sdk:546.0.0-slim
+  environment:
+    name: $CI_COMMIT_BRANCH
   needs:
     - job: deploy
   rules:
