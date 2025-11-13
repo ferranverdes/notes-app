@@ -14,8 +14,8 @@ async function seed() {
   console.log("Starting database seed...");
 
   try {
-    // Only clear data if not in staging
-    if (process.env.NODE_ENV !== "staging") {
+    // Purge notes table only in development environment
+    if (process.env.NODE_ENV === "development") {
       await prisma.note.deleteMany();
       await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Note_id_seq" RESTART WITH 1`);
     }

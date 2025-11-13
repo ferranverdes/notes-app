@@ -53,8 +53,15 @@ test:
 build:
   stage: build
   image: pulumi/pulumi-nodejs:3.205.0
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables: { TARGET_ENV: "stage" }
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      variables: { TARGET_ENV: "dev" }
+    - if: '$CI_COMMIT_BRANCH == "prod"'
+      variables: { TARGET_ENV: "prod" }
   environment:
-    name: $CI_COMMIT_BRANCH # defines the deployment environment (dev, stage, prod) so GitLab injects environment-scoped variables
+    name: $TARGET_ENV # defines the deployment environment (dev, stage, prod) so GitLab injects environment-scoped variables
   services:
     - docker:28.5.1-dind
   variables:
@@ -81,16 +88,19 @@ build:
   artifacts: # define files to be passed between jobs (e.g. env vars, binaries, reports)
     reports:
       dotenv: environments/build/build.env
-  only: # run this job only for these branches (dev, stage, prod)
-    - dev
-    - stage
-    - prod
 
 deploy:
   stage: deploy
   image: pulumi/pulumi-nodejs:3.205.0
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables: { TARGET_ENV: "stage" }
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      variables: { TARGET_ENV: "dev" }
+    - if: '$CI_COMMIT_BRANCH == "prod"'
+      variables: { TARGET_ENV: "prod" }
   environment:
-    name: $CI_COMMIT_BRANCH
+    name: $TARGET_ENV
   needs:
     - job: build # allows this job to start as soon as 'build' finishes and access its artifacts
   cache:
@@ -116,16 +126,17 @@ deploy:
   artifacts:
     reports:
       dotenv: environments/deploy/deploy.env
-  only:
-    - dev
-    - stage
-    - prod
 
 seed_database: # triggers a Cloud Run job that inserts fake data into the database
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables: { TARGET_ENV: "stage" }
+    - if: '$CI_COMMIT_BRANCH == "dev"'
+      variables: { TARGET_ENV: "dev" }
   environment:
-    name: $CI_COMMIT_BRANCH
+    name: $TARGET_ENV
   needs:
     - job: deploy
   before_script:
@@ -135,15 +146,12 @@ seed_database: # triggers a Cloud Run job that inserts fake data into the databa
     - gcloud config set project "$GCP_PROJECT"
   script:
     - gcloud run jobs execute "$SEED_JOB_NAME" --region="$GCP_REGION" --wait
-  allow_failure: false # fail pipeline if seeding fails
-  when: on_success # run automatically after successful deploy
-  only:
-    - dev
-    - stage
 
 generate_openapi:
   stage: deploy
   image: node:22-alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
     - cd app
     - npm ci --prefer-offline
@@ -152,18 +160,16 @@ generate_openapi:
   artifacts:
     paths:
       - app/docs/openapi.json
-  only:
-    - stage
 
 dast_headers:
   stage: dast
   image: google/cloud-sdk:546.0.0-slim
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
   environment:
     name: stage
   needs:
     - job: deploy
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "stage"'
   before_script:
     - cd environments
     - echo "$GOOGLE_CREDENTIALS_DAST_B64" | base64 -d > ./credentials/dast-service-account-key.json
@@ -177,32 +183,13 @@ dast_headers:
 
 api_security:
   stage: dast
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
   needs:
     - job: deploy # get CLOUD_RUN_URL from deploy.env
     - job: seed_database
     - job: dast_headers # get APISEC_REQUEST_HEADERS_BASE64 env var from headers.env
     - job: generate_openapi # get app/docs/openapi.json
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "stage"'
   variables:
     APISEC_TARGET_URL: "$CLOUD_RUN_URL"
     APISEC_OPENAPI: "app/docs/openapi.json"
-
-ingest_dast_report:
-  stage: dast
-  image: alpine:3.20
-  rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-  needs:
-    - project: $CI_PROJECT_PATH
-      ref: stage
-      job: api_security
-      artifacts: true
-  script:
-    - test -f gl-api-security-report.json # check that the report file exists
-  artifacts:
-    reports:
-      dast: gl-api-security-report.json
-    paths:
-      - gl-api-security-report.json
-      - gl-assets/
