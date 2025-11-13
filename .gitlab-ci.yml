@@ -121,7 +121,21 @@ deploy:
     - stage
     - prod
 
-seed: # triggers a Cloud Run job that inserts fake data into the database
+generate_openapi:
+  stage: deploy
+  image: node:22-alpine
+  before_script:
+    - cd app
+    - npm ci --prefer-offline
+  script:
+    - npm run generate:openapi
+  artifacts:
+    paths:
+      - app/docs/openapi.json
+  only:
+    - stage
+
+seed_database: # triggers a Cloud Run job that inserts fake data into the database
   stage: deploy
   image: google/cloud-sdk:546.0.0-slim
   environment:
@@ -164,11 +178,12 @@ dast_headers:
 api_security:
   stage: dast
   needs:
-    - job: deploy
-    - job: seed
-    - job: dast_headers
+    - job: deploy # get CLOUD_RUN_URL from deploy.env
+    - job: seed_database
+    - job: dast_headers # get APISEC_REQUEST_HEADERS_BASE64 env var from headers.env
+    - job: generate_openapi # get app/docs/openapi.json
   rules:
     - if: '$CI_COMMIT_BRANCH == "stage"'
   variables:
     APISEC_TARGET_URL: "$CLOUD_RUN_URL"
-    APISEC_REQUEST_HEADERS_BASE64: "$APISEC_REQUEST_HEADERS_BASE64"
+    APISEC_OPENAPI: "app/docs/openapi.json"

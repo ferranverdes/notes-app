@@ -167,6 +167,9 @@ dist
 # SQLite database file used for testing
 test.db
 
+# OpenAPI specification generated locally
+openapi.json
+
 # Service account key used within the GCP project to deploy resources
 service-account-key.json
 

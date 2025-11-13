@@ -7,25 +7,27 @@
     "start": "node src/server.js",
     "migrate": "npx prisma migrate dev --name init",
     "migrate:deploy": "npx prisma migrate deploy",
-    "generate": "npx prisma generate",
-    "postinstall": "npm run generate",
+    "generate:prisma": "npx prisma generate",
+    "postinstall": "npm run generate:prisma",
     "seed": "node prisma/seeder/index.js",
     "test:db:prepare": "NODE_ENV=test DATABASE_URL='file:./test.db' npx prisma db push --schema prisma/schema.test.prisma",
     "pretest": "npm run test:db:prepare",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "generate:openapi": "node docs/index.js"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@faker-js/faker": "^10.1.0",
     "@prisma/client": "^6.18.0",
+    "axios": "0.21.0",
     "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "axios": "0.21.0"
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "jest": "^30.2.0",
     "prisma": "^6.18.0",
-    "supertest": "^7.1.4"
+    "supertest": "^7.1.4",
+    "swagger-jsdoc": "^6.2.8"
   }
 }
